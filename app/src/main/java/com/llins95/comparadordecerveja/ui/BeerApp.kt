@@ -18,9 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -33,16 +35,23 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +66,7 @@ import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val ptBr = Locale("pt", "BR")
 private val currencyFormatter: NumberFormat = NumberFormat.getCurrencyInstance(ptBr)
@@ -72,6 +82,10 @@ private data class AppTab(
 fun BeerApp(viewModel: BeerViewModel) {
     val offers by viewModel.offers.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val editingOffer = offers.firstOrNull { it.id == editingOfferId }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     val tabs = listOf(
         AppTab("Início") { Icon(Icons.Rounded.Home, contentDescription = null) },
@@ -84,11 +98,16 @@ fun BeerApp(viewModel: BeerViewModel) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = tabs[selectedTab].title,
+                        text = if (selectedTab == 1 && editingOfferId != null) {
+                            "Editar oferta"
+                        } else {
+                            tabs[selectedTab].title
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -106,7 +125,10 @@ fun BeerApp(viewModel: BeerViewModel) {
                 tabs.forEachIndexed { index, tab ->
                     NavigationBarItem(
                         selected = selectedTab == index,
-                        onClick = { selectedTab = index },
+                        onClick = {
+                            editingOfferId = null
+                            selectedTab = index
+                        },
                         icon = tab.icon,
                         label = { Text(tab.title, style = MaterialTheme.typography.labelSmall) }
                     )
@@ -115,17 +137,69 @@ fun BeerApp(viewModel: BeerViewModel) {
         }
     ) { padding ->
         when (selectedTab) {
-            0 -> HomeScreen(offers, padding, onAdd = { selectedTab = 1 })
+            0 -> HomeScreen(
+                offers,
+                padding,
+                onAdd = {
+                    editingOfferId = null
+                    selectedTab = 1
+                }
+            )
             1 -> AddOfferScreen(
                 padding = padding,
+                initialOffer = editingOffer,
                 onSave = { brand, packageType, volume, quantity, price, store, returnable ->
-                    viewModel.addOffer(brand, packageType, volume, quantity, price, store, returnable)
-                    selectedTab = 0
+                    if (editingOffer == null) {
+                        viewModel.addOffer(brand, packageType, volume, quantity, price, store, returnable)
+                        selectedTab = 0
+                    } else {
+                        viewModel.updateOffer(
+                            editingOffer,
+                            brand,
+                            packageType,
+                            volume,
+                            quantity,
+                            price,
+                            store,
+                            returnable
+                        )
+                        selectedTab = 4
+                    }
+                    editingOfferId = null
+                },
+                onCancel = if (editingOfferId != null) {
+                    {
+                        editingOfferId = null
+                        selectedTab = 4
+                    }
+                } else {
+                    null
                 }
             )
             2 -> RankingScreen(offers, padding)
             3 -> SimulatorScreen(offers, padding)
-            else -> HistoryScreen(offers, padding, onDelete = viewModel::deleteOffer)
+            else -> HistoryScreen(
+                offers = offers,
+                padding = padding,
+                onEdit = { offer ->
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+                onDelete = { offer ->
+                    coroutineScope.launch {
+                        viewModel.deleteOffer(offer)
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Oferta de ${offer.brand} excluída",
+                            actionLabel = "Desfazer",
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Long
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.restoreOffer(offer)
+                        }
+                    }
+                }
+            )
         }
     }
 }
@@ -240,15 +314,27 @@ private fun HomeScreen(
 @Composable
 private fun AddOfferScreen(
     padding: PaddingValues,
-    onSave: (String, String, Int, Int, Double, String, Boolean) -> Unit
+    initialOffer: BeerOfferEntity? = null,
+    onSave: (String, String, Int, Int, Double, String, Boolean) -> Unit,
+    onCancel: (() -> Unit)? = null
 ) {
-    var brand by rememberSaveable { mutableStateOf("") }
-    var packageType by rememberSaveable { mutableStateOf("Lata") }
-    var volume by rememberSaveable { mutableStateOf("") }
-    var quantity by rememberSaveable { mutableStateOf("1") }
-    var price by rememberSaveable { mutableStateOf("") }
-    var store by rememberSaveable { mutableStateOf("") }
-    var returnable by rememberSaveable { mutableStateOf(false) }
+    var brand by rememberSaveable(initialOffer?.id) { mutableStateOf(initialOffer?.brand.orEmpty()) }
+    var packageType by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.packageType ?: "Lata")
+    }
+    var volume by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.volumeMl?.toString().orEmpty())
+    }
+    var quantity by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.quantity?.toString() ?: "1")
+    }
+    var price by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.totalPrice?.let { String.format(ptBr, "%.2f", it) }.orEmpty())
+    }
+    var store by rememberSaveable(initialOffer?.id) { mutableStateOf(initialOffer?.store.orEmpty()) }
+    var returnable by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.hasReturnableBottle ?: false)
+    }
 
     val volumeValue = volume.toIntOrNull()
     val quantityValue = quantity.toIntOrNull()
@@ -262,12 +348,16 @@ private fun AddOfferScreen(
     ) {
         item {
             Text(
-                "Informe os dados da oferta",
+                if (initialOffer == null) "Informe os dados da oferta" else "Atualize os dados da oferta",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                "Quantidade e volume entram automaticamente no cálculo do preço por litro.",
+                if (initialOffer == null) {
+                    "Quantidade e volume entram automaticamente no cálculo do preço por litro."
+                } else {
+                    "As alterações atualizarão automaticamente o preço por litro e o ranking."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -357,15 +447,29 @@ private fun AddOfferScreen(
             }
         }
         item {
-            Button(
-                enabled = isValid,
-                onClick = {
-                    onSave(brand, packageType, volumeValue!!, quantityValue!!, priceValue!!, store, returnable)
-                },
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Salvar oferta")
+                Button(
+                    enabled = isValid,
+                    onClick = {
+                        onSave(brand, packageType, volumeValue!!, quantityValue!!, priceValue!!, store, returnable)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Text(if (initialOffer == null) "Salvar oferta" else "Salvar alterações")
+                }
+                if (onCancel != null) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Text("Cancelar edição")
+                    }
+                }
             }
         }
     }
@@ -511,9 +615,12 @@ private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValue
 private fun HistoryScreen(
     offers: List<BeerOfferEntity>,
     padding: PaddingValues,
+    onEdit: (BeerOfferEntity) -> Unit,
     onDelete: (BeerOfferEntity) -> Unit
 ) {
     val history = remember(offers) { offers.sortedByDescending { it.createdAt } }
+    var offerPendingDeletion by remember { mutableStateOf<BeerOfferEntity?>(null) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -552,12 +659,45 @@ private fun HistoryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(onClick = { onDelete(offer) }) {
-                        Icon(Icons.Rounded.Delete, contentDescription = "Excluir")
+                    Row {
+                        IconButton(onClick = { onEdit(offer) }) {
+                            Icon(Icons.Rounded.Edit, contentDescription = "Editar")
+                        }
+                        IconButton(onClick = { offerPendingDeletion = offer }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Excluir")
+                        }
                     }
                 }
             }
         }
+    }
+
+    offerPendingDeletion?.let { offer ->
+        AlertDialog(
+            onDismissRequest = { offerPendingDeletion = null },
+            icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text("Excluir oferta?") },
+            text = {
+                Text(
+                    "A oferta de ${offer.brand} será removida do Histórico, Início, Ranking e Simulador."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        offerPendingDeletion = null
+                        onDelete(offer)
+                    }
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { offerPendingDeletion = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
