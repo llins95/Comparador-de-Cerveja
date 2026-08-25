@@ -1,10 +1,10 @@
-# 🍺 Comparador de Cerveja
+# 🍺 Cerva
 
 Aplicativo Android **offline** para comparar ofertas de cerveja de forma justa pelo **preço por litro (R$/L)**.
 
 ## Objetivo
 
-Uma lata, um pack, uma garrafa de 600 ml e um litrão podem ter preços muito diferentes. O app normaliza tudo pela quantidade total de bebida:
+Uma lata, um pack, uma garrafa de 600 ml e um litrão podem ter preços muito diferentes. A **Cerva** normaliza tudo pela quantidade total de bebida:
 
 ```text
 volume total = volume por unidade × quantidade
@@ -23,6 +23,8 @@ Exemplo: 12 latas de 350 ml por R$ 39,90 correspondem a 4,2 L e **R$ 9,50/L**.
 - exclusão de registros;
 - identificação de loja e vasilhame retornável;
 - funcionamento totalmente offline com Room;
+- interface em Material Design 3 com cores dinâmicas no Android 12+;
+- ícone adaptativo com suporte a ícone temático no Android 13+;
 - arquitetura preparada para fontes de preço futuras (ex.: integração oficial com Zé Delivery).
 
 ## Tecnologias
