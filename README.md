@@ -43,6 +43,8 @@ A Cerva segue o mesmo modelo de atualização do FinFlow:
 
 As releases de produção precisam ser assinadas sempre com o mesmo keystore. O workflow espera os Repository Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD`. O keystore e suas senhas nunca devem ser versionados no repositório público.
 
+> Enquanto esses segredos de assinatura não estiverem configurados, o GitHub Actions continuará gerando APKs de teste normalmente, mas não publicará uma GitHub Release de produção. Isso evita distribuir atualizações com assinaturas diferentes.
+
 ## Tecnologias
 
 - Kotlin
