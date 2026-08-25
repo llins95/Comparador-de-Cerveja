@@ -47,7 +47,7 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun ComparadorTheme(
+fun CervaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
