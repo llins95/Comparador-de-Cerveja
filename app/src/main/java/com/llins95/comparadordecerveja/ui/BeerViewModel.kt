@@ -43,6 +43,31 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
         }
     }
 
+    fun updateOffer(
+        offer: BeerOfferEntity,
+        brand: String,
+        packageType: String,
+        volumeMl: Int,
+        quantity: Int,
+        totalPrice: Double,
+        store: String,
+        hasReturnableBottle: Boolean
+    ) {
+        viewModelScope.launch {
+            repository.addOffer(
+                offer.copy(
+                    brand = brand.trim(),
+                    packageType = packageType.trim(),
+                    volumeMl = volumeMl,
+                    quantity = quantity,
+                    totalPrice = totalPrice,
+                    store = store.trim(),
+                    hasReturnableBottle = hasReturnableBottle
+                )
+            )
+        }
+    }
+
     fun deleteOffer(offer: BeerOfferEntity) {
         viewModelScope.launch { repository.deleteOffer(offer) }
     }
