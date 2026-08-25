@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -37,14 +38,20 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +66,7 @@ import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val ptBr = Locale("pt", "BR")
 private val currencyFormatter: NumberFormat = NumberFormat.getCurrencyInstance(ptBr)
@@ -76,6 +84,8 @@ fun BeerApp(viewModel: BeerViewModel) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
     val editingOffer = offers.firstOrNull { it.id == editingOfferId }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     val tabs = listOf(
         AppTab("Início") { Icon(Icons.Rounded.Home, contentDescription = null) },
@@ -88,6 +98,7 @@ fun BeerApp(viewModel: BeerViewModel) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -174,7 +185,20 @@ fun BeerApp(viewModel: BeerViewModel) {
                     editingOfferId = offer.id
                     selectedTab = 1
                 },
-                onDelete = viewModel::deleteOffer
+                onDelete = { offer ->
+                    coroutineScope.launch {
+                        viewModel.deleteOffer(offer)
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Oferta de ${offer.brand} excluída",
+                            actionLabel = "Desfazer",
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Long
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.restoreOffer(offer)
+                        }
+                    }
+                }
             )
         }
     }
@@ -595,6 +619,8 @@ private fun HistoryScreen(
     onDelete: (BeerOfferEntity) -> Unit
 ) {
     val history = remember(offers) { offers.sortedByDescending { it.createdAt } }
+    var offerPendingDeletion by remember { mutableStateOf<BeerOfferEntity?>(null) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -637,13 +663,41 @@ private fun HistoryScreen(
                         IconButton(onClick = { onEdit(offer) }) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Editar")
                         }
-                        IconButton(onClick = { onDelete(offer) }) {
+                        IconButton(onClick = { offerPendingDeletion = offer }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Excluir")
                         }
                     }
                 }
             }
         }
+    }
+
+    offerPendingDeletion?.let { offer ->
+        AlertDialog(
+            onDismissRequest = { offerPendingDeletion = null },
+            icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text("Excluir oferta?") },
+            text = {
+                Text(
+                    "A oferta de ${offer.brand} será removida do Histórico, Início, Ranking e Simulador."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        offerPendingDeletion = null
+                        onDelete(offer)
+                    }
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { offerPendingDeletion = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
