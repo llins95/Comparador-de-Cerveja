@@ -68,9 +68,9 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
         }
     }
 
-    fun deleteOffer(offer: BeerOfferEntity) {
-        viewModelScope.launch { repository.deleteOffer(offer) }
-    }
+    suspend fun deleteOffer(offer: BeerOfferEntity) = repository.deleteOffer(offer.id)
+
+    suspend fun restoreOffer(offer: BeerOfferEntity) = repository.addOffer(offer)
 
     companion object {
         fun factory(repository: BeerRepository): ViewModelProvider.Factory =
