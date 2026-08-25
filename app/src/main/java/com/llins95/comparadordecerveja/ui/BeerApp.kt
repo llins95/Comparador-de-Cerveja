@@ -22,10 +22,12 @@ import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +35,9 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -79,18 +82,33 @@ fun BeerApp(viewModel: BeerViewModel) {
     )
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            TopAppBar(title = { Text(tabs[selectedTab].title) })
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = tabs[selectedTab].title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 0.dp
+            ) {
                 tabs.forEachIndexed { index, tab ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         icon = tab.icon,
-                        label = { Text(tab.title) }
+                        label = { Text(tab.title, style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -120,41 +138,101 @@ private fun HomeScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Compare e economize",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Veja rapidamente qual oferta entrega mais cerveja pelo menor preço.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         if (offers.isEmpty()) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge
+                ) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         Text("Nenhum preço cadastrado", style = MaterialTheme.typography.titleLarge)
-                        Text("Adicione uma oferta para o app calcular automaticamente o preço por litro e montar o ranking.")
-                        Button(onClick = onAdd) { Text("Adicionar primeiro preço") }
+                        Text(
+                            "Adicione uma oferta para calcular automaticamente o preço por litro e montar o ranking.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FilledTonalButton(onClick = onAdd) {
+                            Icon(Icons.Rounded.AddCircle, contentDescription = null)
+                            Spacer(Modifier.padding(horizontal = 4.dp))
+                            Text("Adicionar primeiro preço")
+                        }
                     }
                 }
             }
         } else {
             val cheapest = offers.first()
             item {
-                Text("Mais barata agora", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text("🥇 ${cheapest.brand}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text(offerDescription(cheapest))
-                        Spacer(Modifier.height(8.dp))
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Text(
-                            formatPricePerLiter(cheapest.pricePerLiter),
+                            "MELHOR PREÇO AGORA",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            "🥇 ${cheapest.brand}",
                             style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold
                         )
-                        Text("Oferta: ${currencyFormatter.format(cheapest.totalPrice)}${storeSuffix(cheapest)}")
+                        Text(
+                            offerDescription(cheapest),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            formatPricePerLiter(cheapest.pricePerLiter),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Oferta: ${currencyFormatter.format(cheapest.totalPrice)}${storeSuffix(cheapest)}",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }
-            item { Text("Top 5", style = MaterialTheme.typography.titleMedium) }
-            items(offers.take(5)) { offer -> OfferRow(offer) }
+
+            item {
+                Text(
+                    "Top 5 ofertas",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            items(offers.take(5), key = { it.id }) { offer ->
+                OfferRow(offer)
+            }
         }
     }
 }
@@ -179,48 +257,101 @@ private fun AddOfferScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { Text("Cadastre o preço encontrado. Quantidade e volume serão usados no cálculo.") }
-        item { OutlinedTextField(brand, { brand = it }, label = { Text("Marca") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
-        item { OutlinedTextField(packageType, { packageType = it }, label = { Text("Embalagem") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+        item {
+            Text(
+                "Informe os dados da oferta",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Quantidade e volume entram automaticamente no cálculo do preço por litro.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        item { OutlinedTextField(brand, { brand = it }, label = { Text("Marca") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
+        item { OutlinedTextField(packageType, { packageType = it }, label = { Text("Embalagem") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
         item {
             OutlinedTextField(
-                volume, { volume = it.filter(Char::isDigit) },
-                label = { Text("Volume por unidade (ml)") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                volume,
+                { volume = it.filter(Char::isDigit) },
+                label = { Text("Volume por unidade (ml)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
         item {
             OutlinedTextField(
-                quantity, { quantity = it.filter(Char::isDigit) },
-                label = { Text("Quantidade de unidades") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                quantity,
+                { quantity = it.filter(Char::isDigit) },
+                label = { Text("Quantidade de unidades") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
         item {
             OutlinedTextField(
-                price, { price = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
-                label = { Text("Preço total (R$)") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                price,
+                { price = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
+                label = { Text("Preço total (R$)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
         }
-        item { OutlinedTextField(store, { store = it }, label = { Text("Loja (opcional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+        item { OutlinedTextField(store, { store = it }, label = { Text("Loja (opcional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = returnable, onCheckedChange = { returnable = it })
-                Text("Inclui vasilhame retornável")
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = returnable, onCheckedChange = { returnable = it })
+                    Column {
+                        Text("Vasilhame retornável", fontWeight = FontWeight.Medium)
+                        Text(
+                            "Marque se o preço inclui o vasilhame.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
         if (isValid) {
             item {
                 val perLiter = BeerPriceCalculator.pricePerLiter(priceValue!!, volumeValue!!, quantityValue!!)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Prévia", fontWeight = FontWeight.Bold)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Column(
+                        Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Prévia da comparação", fontWeight = FontWeight.Bold)
                         Text("Volume total: ${formatVolume(BeerPriceCalculator.totalVolumeMl(volumeValue, quantityValue).toLong())}")
-                        Text(formatPricePerLiter(perLiter), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text(
+                            formatPricePerLiter(perLiter),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -231,8 +362,11 @@ private fun AddOfferScreen(
                 onClick = {
                     onSave(brand, packageType, volumeValue!!, quantityValue!!, priceValue!!, store, returnable)
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Salvar oferta") }
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text("Salvar oferta")
+            }
         }
     }
 }
@@ -241,26 +375,58 @@ private fun AddOfferScreen(
 private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        item {
+            Text(
+                "Do menor para o maior preço por litro",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         if (offers.isEmpty()) {
-            item { Text("Adicione ofertas para gerar o ranking.") }
+            item { EmptyMessage("Adicione ofertas para gerar o ranking.") }
         } else {
-            items(offers) { offer ->
+            items(offers, key = { it.id }) { offer ->
                 val rank = offers.indexOfFirst { it.id == offer.id } + 1
-                Card(modifier = Modifier.fillMaxWidth()) {
+                val isWinner = rank == 1
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = if (isWinner) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("#$rank", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Column(Modifier.weight(1f)) {
-                            Text(offer.brand, fontWeight = FontWeight.Bold)
-                            Text(offerDescription(offer), style = MaterialTheme.typography.bodySmall)
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isWinner) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                if (isWinner) "🥇" else "#$rank",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isWinner) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
-                        Text(formatPricePerLiter(offer.pricePerLiter), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f)) {
+                            Text(offer.brand, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                offerDescription(offer),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        PricePill(offer.pricePerLiter)
                     }
                 }
             }
@@ -280,31 +446,60 @@ private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValue
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Text(
+                "Quanto rende seu dinheiro?",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Informe um orçamento e veja qual oferta entrega o maior volume.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         item {
             OutlinedTextField(
                 value = budgetText,
                 onValueChange = { budgetText = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
-                label = { Text("Quanto você quer gastar? (R$)") },
+                label = { Text("Orçamento (R$)") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
             )
         }
         if (offers.isEmpty()) {
-            item { Text("Adicione ofertas para usar o simulador.") }
+            item { EmptyMessage("Adicione ofertas para usar o simulador.") }
         } else if (results.isEmpty()) {
-            item { Text("Com esse valor ainda não é possível comprar nenhuma das ofertas cadastradas.") }
+            item { EmptyMessage("Com esse valor ainda não é possível comprar nenhuma oferta cadastrada.") }
         } else {
-            item { Text("Mais cerveja pelo orçamento", style = MaterialTheme.typography.titleMedium) }
-            items(results) { (offer, volume) ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(offer.brand, fontWeight = FontWeight.Bold)
-                        Text(offerDescription(offer))
-                        Text("Você consegue comprar ${formatVolume(volume)}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            item {
+                Text(
+                    "Mais cerveja pelo orçamento",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            items(results, key = { it.first.id }) { (offer, volume) ->
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Column(
+                        Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(offer.brand, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(offerDescription(offer), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Você consegue comprar ${formatVolume(volume)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -321,23 +516,41 @@ private fun HistoryScreen(
     val history = remember(offers) { offers.sortedByDescending { it.createdAt } }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        item {
+            Text(
+                "Preços cadastrados recentemente",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         if (history.isEmpty()) {
-            item { Text("Seu histórico de preços aparecerá aqui.") }
+            item { EmptyMessage("Seu histórico de preços aparecerá aqui.") }
         }
         items(history, key = { it.id }) { offer ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(offer.brand, fontWeight = FontWeight.Bold)
-                        Text(offerDescription(offer), style = MaterialTheme.typography.bodySmall)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(offer.brand, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            offerDescription(offer),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("${currencyFormatter.format(offer.totalPrice)} • ${formatPricePerLiter(offer.pricePerLiter)}")
-                        Text(dateFormatter.format(Date(offer.createdAt)), style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            dateFormatter.format(Date(offer.createdAt)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     IconButton(onClick = { onDelete(offer) }) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Excluir")
@@ -350,15 +563,57 @@ private fun HistoryScreen(
 
 @Composable
 private fun OfferRow(offer: BeerOfferEntity) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(offer.brand, fontWeight = FontWeight.SemiBold)
-                Text(offerDescription(offer), style = MaterialTheme.typography.bodySmall)
+                Text(offer.brand, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    offerDescription(offer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Text(formatPricePerLiter(offer.pricePerLiter), fontWeight = FontWeight.Bold)
+            PricePill(offer.pricePerLiter)
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+    }
+}
+
+@Composable
+private fun PricePill(pricePerLiter: Double) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Text(
+            formatPricePerLiter(pricePerLiter),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun EmptyMessage(message: String) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge
+    ) {
+        Text(
+            message,
+            modifier = Modifier.padding(24.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
