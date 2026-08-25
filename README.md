@@ -2,6 +2,8 @@
 
 Aplicativo Android **offline** para comparar ofertas de cerveja de forma justa pelo **preço por litro (R$/L)**.
 
+> **Cerva — compare e economize.**
+
 ## Objetivo
 
 Uma lata, um pack, uma garrafa de 600 ml e um litrão podem ter preços muito diferentes. A **Cerva** normaliza tudo pela quantidade total de bebida:
