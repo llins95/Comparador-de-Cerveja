@@ -5,5 +5,5 @@ class BeerRepository(private val dao: BeerOfferDao) {
 
     suspend fun addOffer(offer: BeerOfferEntity) = dao.insert(offer)
 
-    suspend fun deleteOffer(offer: BeerOfferEntity) = dao.delete(offer)
+    suspend fun deleteOffer(offerId: Long) = dao.deleteById(offerId)
 }
