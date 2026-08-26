@@ -15,6 +15,9 @@ preço por litro = preço total ÷ volume total × 1000
 
 Exemplo: 12 latas de 350 ml por R$ 39,90 correspondem a 4,2 L e **R$ 9,50/L**.
 
+Em uma promoção de 21 garrafas de 1 L por R$ 5,49 cada, a compra mínima é
+R$ 115,29. O ranking considera os 21 L do conjunto e mostra **R$ 5,49/L**.
+
 ## Recursos
 
 - cadastro manual de ofertas;
