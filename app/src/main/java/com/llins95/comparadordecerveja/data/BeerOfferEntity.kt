@@ -1,7 +1,7 @@
 package com.llins95.comparadordecerveja.data
 
-import androidx.room.Entity
 import androidx.room.ColumnInfo
+import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.llins95.comparadordecerveja.domain.BeerPriceCalculator
 
