@@ -26,4 +26,15 @@ class BeerPriceCalculatorTest {
 
         assertEquals(8400L, volume)
     }
+
+    @Test
+    fun simulatorReportsIndividualPackageCount() {
+        val units = BeerPriceCalculator.purchasableUnits(
+            budget = 100.0,
+            packPrice = 39.90,
+            quantity = 12
+        )
+
+        assertEquals(24L, units)
+    }
 }

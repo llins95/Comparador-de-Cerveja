@@ -1,5 +1,6 @@
 package com.llins95.comparadordecerveja.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,19 +17,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircle
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,7 +68,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.llins95.comparadordecerveja.BuildConfig
 import com.llins95.comparadordecerveja.data.BeerOfferEntity
+import com.llins95.comparadordecerveja.data.PackageSizeOption
 import com.llins95.comparadordecerveja.domain.BeerPriceCalculator
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -79,10 +89,17 @@ private data class AppTab(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BeerApp(viewModel: BeerViewModel) {
+fun BeerApp(
+    viewModel: BeerViewModel,
+    settingsViewModel: SettingsViewModel,
+    onOpenUpdate: () -> Unit,
+) {
     val offers by viewModel.offers.collectAsStateWithLifecycle()
+    val packageSizes by settingsViewModel.packageSizes.collectAsStateWithLifecycle()
+    val stores by settingsViewModel.stores.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     val editingOffer = offers.firstOrNull { it.id == editingOfferId }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -95,6 +112,10 @@ fun BeerApp(viewModel: BeerViewModel) {
         AppTab("Histórico") { Icon(Icons.Rounded.History, contentDescription = null) }
     )
 
+    BackHandler(enabled = showSettings) {
+        showSettings = false
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -103,10 +124,10 @@ fun BeerApp(viewModel: BeerViewModel) {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = if (selectedTab == 1 && editingOfferId != null) {
-                            "Editar oferta"
-                        } else {
-                            tabs[selectedTab].title
+                        text = when {
+                            showSettings -> "Configurações"
+                            selectedTab == 1 && editingOfferId != null -> "Editar oferta"
+                            else -> tabs[selectedTab].title
                         },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
@@ -114,29 +135,56 @@ fun BeerApp(viewModel: BeerViewModel) {
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
-                )
+                ),
+                navigationIcon = {
+                    if (showSettings) {
+                        IconButton(onClick = { showSettings = false }) {
+                            Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar")
+                        }
+                    }
+                },
+                actions = {
+                    if (!showSettings) {
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(Icons.Rounded.Settings, contentDescription = "Configurações")
+                        }
+                    }
+                },
             )
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 0.dp
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = {
-                            editingOfferId = null
-                            selectedTab = index
-                        },
-                        icon = tab.icon,
-                        label = { Text(tab.title, style = MaterialTheme.typography.labelSmall) }
-                    )
+            if (!showSettings) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 0.dp
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        NavigationBarItem(
+                            selected = selectedTab == index,
+                            onClick = {
+                                editingOfferId = null
+                                selectedTab = index
+                            },
+                            icon = tab.icon,
+                            label = { Text(tab.title, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
                 }
             }
         }
     ) { padding ->
-        when (selectedTab) {
+        if (showSettings) {
+            SettingsScreen(
+                padding = padding,
+                packageSizes = packageSizes,
+                stores = stores,
+                onOpenUpdate = onOpenUpdate,
+                onAddPackageSize = settingsViewModel::addPackageSize,
+                onDeletePackageSize = settingsViewModel::deletePackageSize,
+                onAddStore = settingsViewModel::addStore,
+                onDeleteStore = settingsViewModel::deleteStore,
+            )
+        } else when (selectedTab) {
             0 -> HomeScreen(
                 offers,
                 padding,
@@ -148,6 +196,8 @@ fun BeerApp(viewModel: BeerViewModel) {
             1 -> AddOfferScreen(
                 padding = padding,
                 initialOffer = editingOffer,
+                packageSizes = packageSizes,
+                stores = stores,
                 onSave = { brand, packageType, volume, quantity, price, store, returnable ->
                     if (editingOffer == null) {
                         viewModel.addOffer(brand, packageType, volume, quantity, price, store, returnable)
@@ -311,19 +361,26 @@ private fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddOfferScreen(
     padding: PaddingValues,
     initialOffer: BeerOfferEntity? = null,
+    packageSizes: List<PackageSizeOption>,
+    stores: List<String>,
     onSave: (String, String, Int, Int, Double, String, Boolean) -> Unit,
     onCancel: (() -> Unit)? = null
 ) {
     var brand by rememberSaveable(initialOffer?.id) { mutableStateOf(initialOffer?.brand.orEmpty()) }
+    val defaultPackage = packageSizes.firstOrNull()
     var packageType by rememberSaveable(initialOffer?.id) {
-        mutableStateOf(initialOffer?.packageType ?: "Lata")
+        mutableStateOf(initialOffer?.packageType ?: defaultPackage?.name.orEmpty())
     }
     var volume by rememberSaveable(initialOffer?.id) {
-        mutableStateOf(initialOffer?.volumeMl?.toString().orEmpty())
+        mutableStateOf(
+            initialOffer?.volumeMl?.toString()
+                ?: defaultPackage?.volumeMl?.toString().orEmpty()
+        )
     }
     var quantity by rememberSaveable(initialOffer?.id) {
         mutableStateOf(initialOffer?.quantity?.toString() ?: "1")
@@ -335,6 +392,8 @@ private fun AddOfferScreen(
     var returnable by rememberSaveable(initialOffer?.id) {
         mutableStateOf(initialOffer?.hasReturnableBottle ?: false)
     }
+    var packageMenuExpanded by remember { mutableStateOf(false) }
+    var storeMenuExpanded by remember { mutableStateOf(false) }
 
     val volumeValue = volume.toIntOrNull()
     val quantityValue = quantity.toIntOrNull()
@@ -363,17 +422,55 @@ private fun AddOfferScreen(
             )
         }
         item { OutlinedTextField(brand, { brand = it }, label = { Text("Marca") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
-        item { OutlinedTextField(packageType, { packageType = it }, label = { Text("Embalagem") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
         item {
-            OutlinedTextField(
-                volume,
-                { volume = it.filter(Char::isDigit) },
-                label = { Text("Volume por unidade (ml)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+            ExposedDropdownMenuBox(
+                expanded = packageMenuExpanded,
+                onExpandedChange = {
+                    if (packageSizes.isNotEmpty()) packageMenuExpanded = !packageMenuExpanded
+                },
+            ) {
+                OutlinedTextField(
+                    value = if (packageType.isBlank() || volumeValue == null) {
+                        "Nenhuma embalagem configurada"
+                    } else {
+                        packageOptionLabel(packageType, volumeValue)
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Embalagem") },
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = packageMenuExpanded)
+                    },
+                )
+                ExposedDropdownMenu(
+                    expanded = packageMenuExpanded,
+                    onDismissRequest = { packageMenuExpanded = false },
+                ) {
+                    packageSizes.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(packageOptionLabel(option.name, option.volumeMl)) },
+                            onClick = {
+                                packageType = option.name
+                                volume = option.volumeMl.toString()
+                                packageMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+            if (packageSizes.isEmpty()) {
+                Text(
+                    "Cadastre pelo menos uma embalagem em Configurações.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
         }
         item {
             OutlinedTextField(
@@ -397,7 +494,56 @@ private fun AddOfferScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
         }
-        item { OutlinedTextField(store, { store = it }, label = { Text("Loja (opcional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium) }
+        item {
+            ExposedDropdownMenuBox(
+                expanded = storeMenuExpanded,
+                onExpandedChange = { storeMenuExpanded = !storeMenuExpanded },
+            ) {
+                OutlinedTextField(
+                    value = store.ifBlank { "Sem loja" },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Loja (opcional)") },
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = storeMenuExpanded)
+                    },
+                )
+                ExposedDropdownMenu(
+                    expanded = storeMenuExpanded,
+                    onDismissRequest = { storeMenuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Sem loja") },
+                        onClick = {
+                            store = ""
+                            storeMenuExpanded = false
+                        },
+                    )
+                    stores.forEach { configuredStore ->
+                        DropdownMenuItem(
+                            text = { Text(configuredStore) },
+                            onClick = {
+                                store = configuredStore
+                                storeMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+            if (stores.isEmpty()) {
+                Text(
+                    "Você pode cadastrar lojas em Configurações.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
+        }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -539,12 +685,264 @@ private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues)
 }
 
 @Composable
+private fun SettingsScreen(
+    padding: PaddingValues,
+    packageSizes: List<PackageSizeOption>,
+    stores: List<String>,
+    onOpenUpdate: () -> Unit,
+    onAddPackageSize: (String, Int) -> Boolean,
+    onDeletePackageSize: (PackageSizeOption) -> Unit,
+    onAddStore: (String) -> Boolean,
+    onDeleteStore: (String) -> Unit,
+) {
+    var packageName by rememberSaveable { mutableStateOf("") }
+    var packageVolume by rememberSaveable { mutableStateOf("") }
+    var packageError by rememberSaveable { mutableStateOf<String?>(null) }
+    var storeName by rememberSaveable { mutableStateOf("") }
+    var storeError by rememberSaveable { mutableStateOf<String?>(null) }
+    val packageVolumeValue = packageVolume.toIntOrNull()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "Atualização do aplicativo",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        "Versão instalada: ${BuildConfig.VERSION_NAME}",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    FilledTonalButton(onClick = onOpenUpdate) {
+                        Icon(Icons.Rounded.SystemUpdate, contentDescription = null)
+                        Spacer(Modifier.padding(horizontal = 4.dp))
+                        Text("Verificar atualizações")
+                    }
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Tamanhos das embalagens",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Cadastre o tipo e o volume que aparecerão no campo Embalagem ao adicionar uma oferta.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = packageName,
+                onValueChange = {
+                    packageName = it
+                    packageError = null
+                },
+                label = { Text("Tipo da embalagem") },
+                placeholder = { Text("Ex.: Lata ou Latão") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = packageVolume,
+                onValueChange = {
+                    packageVolume = it.filter(Char::isDigit)
+                    packageError = null
+                },
+                label = { Text("Volume (ml)") },
+                placeholder = { Text("Ex.: 350 ou 473") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = packageError != null,
+                supportingText = packageError?.let { message ->
+                    { Text(message) }
+                },
+            )
+        }
+        item {
+            Button(
+                onClick = {
+                    val added = onAddPackageSize(packageName, packageVolumeValue!!)
+                    if (added) {
+                        packageName = ""
+                        packageVolume = ""
+                        packageError = null
+                    } else {
+                        packageError = "Essa embalagem já está cadastrada."
+                    }
+                },
+                enabled = packageName.isNotBlank() && (packageVolumeValue ?: 0) > 0,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Text("Adicionar embalagem")
+            }
+        }
+        if (packageSizes.isEmpty()) {
+            item { EmptyMessage("Nenhuma embalagem cadastrada.") }
+        } else {
+            items(packageSizes, key = { "${it.name.lowercase(ptBr)}-${it.volumeMl}" }) { option ->
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            packageOptionLabel(option.name, option.volumeMl),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        IconButton(onClick = { onDeletePackageSize(option) }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Excluir embalagem")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(4.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Lojas",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "As lojas cadastradas aparecerão no campo Loja ao adicionar uma oferta.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = storeName,
+                onValueChange = {
+                    storeName = it
+                    storeError = null
+                },
+                label = { Text("Nome da loja") },
+                placeholder = { Text("Ex.: Mercado Central") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                isError = storeError != null,
+                supportingText = storeError?.let { message ->
+                    { Text(message) }
+                },
+            )
+        }
+        item {
+            Button(
+                onClick = {
+                    val added = onAddStore(storeName)
+                    if (added) {
+                        storeName = ""
+                        storeError = null
+                    } else {
+                        storeError = "Essa loja já está cadastrada."
+                    }
+                },
+                enabled = storeName.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Text("Adicionar loja")
+            }
+        }
+        if (stores.isEmpty()) {
+            item { EmptyMessage("Nenhuma loja cadastrada.") }
+        } else {
+            items(stores, key = { it.lowercase(ptBr) }) { store ->
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            store,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        IconButton(onClick = { onDeleteStore(store) }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Excluir loja")
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Text(
+                "Excluir uma embalagem ou loja daqui não altera as ofertas antigas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValues) {
     var budgetText by rememberSaveable { mutableStateOf("30") }
     val budget = budgetText.replace(',', '.').toDoubleOrNull() ?: 0.0
     val results = remember(offers, budget) {
         offers.map { offer ->
-            offer to BeerPriceCalculator.purchasableVolumeMl(budget, offer.totalPrice, offer.volumeMl, offer.quantity)
+            Triple(
+                offer,
+                BeerPriceCalculator.purchasableVolumeMl(
+                    budget,
+                    offer.totalPrice,
+                    offer.volumeMl,
+                    offer.quantity,
+                ),
+                BeerPriceCalculator.purchasableUnits(
+                    budget,
+                    offer.totalPrice,
+                    offer.quantity,
+                ),
+            )
         }.filter { it.second > 0 }.sortedByDescending { it.second }
     }
 
@@ -587,7 +985,7 @@ private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValue
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            items(results, key = { it.first.id }) { (offer, volume) ->
+            items(results, key = { it.first.id }) { (offer, volume, units) ->
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
@@ -599,7 +997,7 @@ private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValue
                         Text(offer.brand, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(offerDescription(offer), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "Você consegue comprar ${formatVolume(volume)}",
+                            "Você consegue comprar ${formatUnits(units)} (${formatVolume(volume)})",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
@@ -766,6 +1164,12 @@ private fun offerDescription(offer: BeerOfferEntity): String {
 private fun storeSuffix(offer: BeerOfferEntity): String = if (offer.store.isBlank()) "" else " • ${offer.store}"
 
 private fun formatPricePerLiter(value: Double): String = "${currencyFormatter.format(value)}/L"
+
+private fun packageOptionLabel(name: String, volumeMl: Int): String =
+    "$name • ${formatVolume(volumeMl.toLong())}"
+
+private fun formatUnits(units: Long): String =
+    if (units == 1L) "1 embalagem" else "$units embalagens"
 
 private fun formatVolume(volumeMl: Long): String = when {
     volumeMl >= 1000 -> String.format(ptBr, "%.2f L", volumeMl / 1000.0)

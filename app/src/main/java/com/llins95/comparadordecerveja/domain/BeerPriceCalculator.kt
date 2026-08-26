@@ -20,4 +20,14 @@ object BeerPriceCalculator {
         val packs = kotlin.math.floor(budget / packPrice).toLong()
         return packs * totalVolumeMl(volumeMl, quantity)
     }
+
+    fun purchasableUnits(
+        budget: Double,
+        packPrice: Double,
+        quantity: Int
+    ): Long {
+        if (budget <= 0 || packPrice <= 0 || quantity <= 0) return 0L
+        val packs = kotlin.math.floor(budget / packPrice).toLong()
+        return packs * quantity
+    }
 }
