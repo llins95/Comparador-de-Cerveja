@@ -19,12 +19,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +41,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -100,6 +105,7 @@ fun BeerApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var settingsSection by rememberSaveable { mutableIntStateOf(0) }
     val editingOffer = offers.firstOrNull { it.id == editingOfferId }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -113,7 +119,11 @@ fun BeerApp(
     )
 
     BackHandler(enabled = showSettings) {
-        showSettings = false
+        if (settingsSection == 0) {
+            showSettings = false
+        } else {
+            settingsSection = 0
+        }
     }
 
     Scaffold(
@@ -125,6 +135,8 @@ fun BeerApp(
                 title = {
                     Text(
                         text = when {
+                            showSettings && settingsSection == 1 -> "Cadastro de embalagens"
+                            showSettings && settingsSection == 2 -> "Cadastro de lojas"
                             showSettings -> "Configurações"
                             selectedTab == 1 && editingOfferId != null -> "Editar oferta"
                             else -> tabs[selectedTab].title
@@ -138,14 +150,27 @@ fun BeerApp(
                 ),
                 navigationIcon = {
                     if (showSettings) {
-                        IconButton(onClick = { showSettings = false }) {
+                        IconButton(
+                            onClick = {
+                                if (settingsSection == 0) {
+                                    showSettings = false
+                                } else {
+                                    settingsSection = 0
+                                }
+                            }
+                        ) {
                             Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar")
                         }
                     }
                 },
                 actions = {
                     if (!showSettings) {
-                        IconButton(onClick = { showSettings = true }) {
+                        IconButton(
+                            onClick = {
+                                settingsSection = 0
+                                showSettings = true
+                            }
+                        ) {
                             Icon(Icons.Rounded.Settings, contentDescription = "Configurações")
                         }
                     }
@@ -174,16 +199,28 @@ fun BeerApp(
         }
     ) { padding ->
         if (showSettings) {
-            SettingsScreen(
-                padding = padding,
-                packageSizes = packageSizes,
-                stores = stores,
-                onOpenUpdate = onOpenUpdate,
-                onAddPackageSize = settingsViewModel::addPackageSize,
-                onDeletePackageSize = settingsViewModel::deletePackageSize,
-                onAddStore = settingsViewModel::addStore,
-                onDeleteStore = settingsViewModel::deleteStore,
-            )
+            when (settingsSection) {
+                1 -> PackageSizesSettingsScreen(
+                    padding = padding,
+                    packageSizes = packageSizes,
+                    onAddPackageSize = settingsViewModel::addPackageSize,
+                    onDeletePackageSize = settingsViewModel::deletePackageSize,
+                )
+                2 -> StoresSettingsScreen(
+                    padding = padding,
+                    stores = stores,
+                    onAddStore = settingsViewModel::addStore,
+                    onDeleteStore = settingsViewModel::deleteStore,
+                )
+                else -> SettingsScreen(
+                    padding = padding,
+                    packageSizeCount = packageSizes.size,
+                    storeCount = stores.size,
+                    onOpenUpdate = onOpenUpdate,
+                    onOpenPackageSizes = { settingsSection = 1 },
+                    onOpenStores = { settingsSection = 2 },
+                )
+            }
         } else when (selectedTab) {
             0 -> HomeScreen(
                 offers,
@@ -198,9 +235,18 @@ fun BeerApp(
                 initialOffer = editingOffer,
                 packageSizes = packageSizes,
                 stores = stores,
-                onSave = { brand, packageType, volume, quantity, price, store, returnable ->
+                onSave = { brand, packageType, volume, quantity, price, priceIsPerUnit, store, returnable ->
                     if (editingOffer == null) {
-                        viewModel.addOffer(brand, packageType, volume, quantity, price, store, returnable)
+                        viewModel.addOffer(
+                            brand,
+                            packageType,
+                            volume,
+                            quantity,
+                            price,
+                            priceIsPerUnit,
+                            store,
+                            returnable,
+                        )
                         selectedTab = 0
                     } else {
                         viewModel.updateOffer(
@@ -210,6 +256,7 @@ fun BeerApp(
                             volume,
                             quantity,
                             price,
+                            priceIsPerUnit,
                             store,
                             returnable
                         )
@@ -340,7 +387,7 @@ private fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "Oferta: ${currencyFormatter.format(cheapest.totalPrice)}${storeSuffix(cheapest)}",
+                            minimumPurchaseDescription(cheapest) + storeSuffix(cheapest),
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -368,7 +415,7 @@ private fun AddOfferScreen(
     initialOffer: BeerOfferEntity? = null,
     packageSizes: List<PackageSizeOption>,
     stores: List<String>,
-    onSave: (String, String, Int, Int, Double, String, Boolean) -> Unit,
+    onSave: (String, String, Int, Int, Double, Boolean, String, Boolean) -> Unit,
     onCancel: (() -> Unit)? = null
 ) {
     var brand by rememberSaveable(initialOffer?.id) { mutableStateOf(initialOffer?.brand.orEmpty()) }
@@ -386,7 +433,15 @@ private fun AddOfferScreen(
         mutableStateOf(initialOffer?.quantity?.toString() ?: "1")
     }
     var price by rememberSaveable(initialOffer?.id) {
-        mutableStateOf(initialOffer?.totalPrice?.let { String.format(ptBr, "%.2f", it) }.orEmpty())
+        mutableStateOf(
+            initialOffer?.let { offer ->
+                val displayedPrice = if (offer.priceIsPerUnit) offer.pricePerUnit else offer.totalPrice
+                String.format(ptBr, "%.2f", displayedPrice)
+            }.orEmpty()
+        )
+    }
+    var priceIsPerUnit by rememberSaveable(initialOffer?.id) {
+        mutableStateOf(initialOffer?.priceIsPerUnit ?: true)
     }
     var store by rememberSaveable(initialOffer?.id) { mutableStateOf(initialOffer?.store.orEmpty()) }
     var returnable by rememberSaveable(initialOffer?.id) {
@@ -398,6 +453,11 @@ private fun AddOfferScreen(
     val volumeValue = volume.toIntOrNull()
     val quantityValue = quantity.toIntOrNull()
     val priceValue = price.replace(',', '.').toDoubleOrNull()
+    val promotionTotalPrice = BeerPriceCalculator.promotionTotalPrice(
+        enteredPrice = priceValue ?: 0.0,
+        quantity = quantityValue ?: 0,
+        priceIsPerUnit = priceIsPerUnit,
+    )
     val isValid = brand.isNotBlank() && (volumeValue ?: 0) > 0 && (quantityValue ?: 0) > 0 && (priceValue ?: 0.0) > 0
 
     LazyColumn(
@@ -476,18 +536,55 @@ private fun AddOfferScreen(
             OutlinedTextField(
                 quantity,
                 { quantity = it.filter(Char::isDigit) },
-                label = { Text("Quantidade de unidades") },
+                label = { Text("Quantidade mínima da promoção") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                supportingText = {
+                    Text("Ex.: 16 ou 21. Use 1 quando não houver quantidade mínima.")
+                },
             )
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Como o preço está anunciado?",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = priceIsPerUnit,
+                        onClick = { priceIsPerUnit = true },
+                        label = { Text("Cada unidade") },
+                    )
+                    FilterChip(
+                        selected = !priceIsPerUnit,
+                        onClick = { priceIsPerUnit = false },
+                        label = { Text("Total da promoção") },
+                    )
+                }
+                Text(
+                    if (priceIsPerUnit) {
+                        "O app multiplicará este valor pela quantidade mínima."
+                    } else {
+                        "Use esta opção quando o anúncio já mostra o valor do conjunto inteiro."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         item {
             OutlinedTextField(
                 price,
                 { price = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
-                label = { Text("Preço total (R$)") },
+                label = {
+                    Text(
+                        if (priceIsPerUnit) "Preço de cada unidade (R$)"
+                        else "Preço total da promoção (R$)"
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
@@ -568,7 +665,11 @@ private fun AddOfferScreen(
         }
         if (isValid) {
             item {
-                val perLiter = BeerPriceCalculator.pricePerLiter(priceValue!!, volumeValue!!, quantityValue!!)
+                val perLiter = BeerPriceCalculator.pricePerLiter(
+                    promotionTotalPrice,
+                    volumeValue!!,
+                    quantityValue!!,
+                )
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
@@ -581,6 +682,8 @@ private fun AddOfferScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text("Prévia da comparação", fontWeight = FontWeight.Bold)
+                        Text("Compra mínima: ${formatUnits(quantityValue.toLong())}")
+                        Text("Total da promoção: ${currencyFormatter.format(promotionTotalPrice)}")
                         Text("Volume total: ${formatVolume(BeerPriceCalculator.totalVolumeMl(volumeValue, quantityValue).toLong())}")
                         Text(
                             formatPricePerLiter(perLiter),
@@ -600,7 +703,16 @@ private fun AddOfferScreen(
                 Button(
                     enabled = isValid,
                     onClick = {
-                        onSave(brand, packageType, volumeValue!!, quantityValue!!, priceValue!!, store, returnable)
+                        onSave(
+                            brand,
+                            packageType,
+                            volumeValue!!,
+                            quantityValue!!,
+                            priceValue!!,
+                            priceIsPerUnit,
+                            store,
+                            returnable,
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
@@ -629,11 +741,18 @@ private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues)
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            Text(
-                "Do menor para o maior preço por litro",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Do menor para o maior preço por litro",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "A quantidade mínima e o total obrigatório entram no cálculo. Em caso de empate, vence a menor compra mínima.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (offers.isEmpty()) {
             item { EmptyMessage("Adicione ofertas para gerar o ranking.") }
@@ -675,6 +794,11 @@ private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues)
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Text(
+                                minimumPurchaseDescription(offer),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         PricePill(offer.pricePerLiter)
                     }
@@ -687,21 +811,12 @@ private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues)
 @Composable
 private fun SettingsScreen(
     padding: PaddingValues,
-    packageSizes: List<PackageSizeOption>,
-    stores: List<String>,
+    packageSizeCount: Int,
+    storeCount: Int,
     onOpenUpdate: () -> Unit,
-    onAddPackageSize: (String, Int) -> Boolean,
-    onDeletePackageSize: (PackageSizeOption) -> Unit,
-    onAddStore: (String) -> Boolean,
-    onDeleteStore: (String) -> Unit,
+    onOpenPackageSizes: () -> Unit,
+    onOpenStores: () -> Unit,
 ) {
-    var packageName by rememberSaveable { mutableStateOf("") }
-    var packageVolume by rememberSaveable { mutableStateOf("") }
-    var packageError by rememberSaveable { mutableStateOf<String?>(null) }
-    var storeName by rememberSaveable { mutableStateOf("") }
-    var storeError by rememberSaveable { mutableStateOf<String?>(null) }
-    val packageVolumeValue = packageVolume.toIntOrNull()
-
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -737,7 +852,104 @@ private fun SettingsScreen(
                 }
             }
         }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Cadastros",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Abra uma categoria para adicionar, consultar ou excluir os itens.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            SettingsNavigationCard(
+                title = "Embalagens",
+                supportingText = packageCountLabel(packageSizeCount),
+                icon = Icons.Rounded.Inventory2,
+                onClick = onOpenPackageSizes,
+            )
+        }
+        item {
+            SettingsNavigationCard(
+                title = "Lojas",
+                supportingText = storeCountLabel(storeCount),
+                icon = Icons.Rounded.Storefront,
+                onClick = onOpenStores,
+            )
+        }
+    }
+}
 
+@Composable
+private fun SettingsNavigationCard(
+    title: String,
+    supportingText: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.padding(10.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Rounded.ChevronRight, contentDescription = "Abrir $title")
+        }
+    }
+}
+
+@Composable
+private fun PackageSizesSettingsScreen(
+    padding: PaddingValues,
+    packageSizes: List<PackageSizeOption>,
+    onAddPackageSize: (String, Int) -> Boolean,
+    onDeletePackageSize: (PackageSizeOption) -> Unit,
+) {
+    var packageName by rememberSaveable { mutableStateOf("") }
+    var packageVolume by rememberSaveable { mutableStateOf("") }
+    var packageError by rememberSaveable { mutableStateOf<String?>(null) }
+    val packageVolumeValue = packageVolume.toIntOrNull()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -834,7 +1046,32 @@ private fun SettingsScreen(
         }
 
         item {
-            Spacer(Modifier.height(4.dp))
+            Text(
+                "Excluir uma embalagem daqui não altera as ofertas antigas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoresSettingsScreen(
+    padding: PaddingValues,
+    stores: List<String>,
+    onAddStore: (String) -> Boolean,
+    onDeleteStore: (String) -> Unit,
+) {
+    var storeName by rememberSaveable { mutableStateOf("") }
+    var storeError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     "Lojas",
@@ -914,7 +1151,7 @@ private fun SettingsScreen(
         }
         item {
             Text(
-                "Excluir uma embalagem ou loja daqui não altera as ofertas antigas.",
+                "Excluir uma loja daqui não altera as ofertas antigas.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -1050,7 +1287,7 @@ private fun HistoryScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text("${currencyFormatter.format(offer.totalPrice)} • ${formatPricePerLiter(offer.pricePerLiter)}")
+                        Text("${minimumPurchaseDescription(offer)} • ${formatPricePerLiter(offer.pricePerLiter)}")
                         Text(
                             dateFormatter.format(Date(offer.createdAt)),
                             style = MaterialTheme.typography.labelSmall,
@@ -1156,10 +1393,25 @@ private fun EmptyMessage(message: String) {
 }
 
 private fun offerDescription(offer: BeerOfferEntity): String {
-    val pack = if (offer.quantity > 1) "${offer.quantity} × ${offer.volumeMl} ml" else "${offer.volumeMl} ml"
+    val pack = if (offer.quantity > 1) {
+        "mínimo ${offer.quantity} × ${offer.volumeMl} ml"
+    } else {
+        "${offer.volumeMl} ml"
+    }
     val returnable = if (offer.hasReturnableBottle) " • com vasilhame" else ""
     return "${offer.packageType} • $pack • ${formatVolume(offer.totalVolumeMl.toLong())}$returnable"
 }
+
+private fun minimumPurchaseDescription(offer: BeerOfferEntity): String {
+    val quantity = if (offer.quantity > 1) " • ${formatUnits(offer.quantity.toLong())}" else ""
+    return "Compra mínima: ${currencyFormatter.format(offer.totalPrice)}$quantity"
+}
+
+private fun packageCountLabel(count: Int): String =
+    if (count == 1) "1 embalagem cadastrada" else "$count embalagens cadastradas"
+
+private fun storeCountLabel(count: Int): String =
+    if (count == 1) "1 loja cadastrada" else "$count lojas cadastradas"
 
 private fun storeSuffix(offer: BeerOfferEntity): String = if (offer.store.isBlank()) "" else " • ${offer.store}"
 
