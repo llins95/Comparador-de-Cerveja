@@ -15,12 +15,16 @@ preço por litro = preço total ÷ volume total × 1000
 
 Exemplo: 12 latas de 350 ml por R$ 39,90 correspondem a 4,2 L e **R$ 9,50/L**.
 
+Em uma promoção de 21 garrafas de 1 L por R$ 5,49 cada, a compra mínima é
+R$ 115,29. O ranking considera os 21 L do conjunto e mostra **R$ 5,49/L**.
+
 ## Recursos
 
 - cadastro manual de ofertas;
-- quantidade e volume entram corretamente no cálculo;
+- promoções com quantidade mínima e preço anunciado por unidade ou pelo total;
+- quantidade e volume entram corretamente no cálculo da compra mínima;
 - ranking automático da opção mais barata para a mais cara;
-- simulador: quanto volume é possível comprar com um orçamento;
+- simulador: quanto volume é possível comprar com um orçamento, respeitando a quantidade mínima;
 - histórico local;
 - exclusão de registros;
 - identificação de loja e vasilhame retornável;
@@ -28,6 +32,7 @@ Exemplo: 12 latas de 350 ml por R$ 39,90 correspondem a 4,2 L e **R$ 9,50/L**.
 - Material Design 3 / Material You, com cores dinâmicas no Android 12+;
 - ícone adaptativo da Cerva e suporte a ícone temático no Android 13+;
 - arquitetura preparada para fontes de preço futuras, como uma integração oficial com o Zé Delivery.
+- cadastros de embalagens e lojas organizados em telas próprias nas Configurações.
 
 ## Atualizações automáticas
 
