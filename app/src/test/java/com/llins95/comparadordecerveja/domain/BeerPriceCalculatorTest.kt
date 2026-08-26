@@ -16,6 +16,30 @@ class BeerPriceCalculatorTest {
     }
 
     @Test
+    fun unitPricePromotionUsesRequiredQuantityToCalculateMinimumPurchase() {
+        val total = BeerPriceCalculator.promotionTotalPrice(
+            enteredPrice = 5.49,
+            quantity = 21,
+            priceIsPerUnit = true,
+        )
+
+        assertEquals(115.29, total, 0.001)
+        assertEquals(5.49, BeerPriceCalculator.pricePerLiter(total, 1_000, 21), 0.001)
+    }
+
+    @Test
+    fun totalPromotionPriceIsNotMultipliedAgain() {
+        val total = BeerPriceCalculator.promotionTotalPrice(
+            enteredPrice = 39.90,
+            quantity = 12,
+            priceIsPerUnit = false,
+        )
+
+        assertEquals(39.90, total, 0.001)
+        assertEquals(3.325, BeerPriceCalculator.pricePerUnit(total, 12), 0.001)
+    }
+
+    @Test
     fun simulatorUsesWholePacks() {
         val volume = BeerPriceCalculator.purchasableVolumeMl(
             budget = 100.0,
