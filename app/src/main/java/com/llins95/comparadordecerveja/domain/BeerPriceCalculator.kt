@@ -10,6 +10,20 @@ object BeerPriceCalculator {
         return totalPrice / totalVolume * 1000.0
     }
 
+    fun promotionTotalPrice(
+        enteredPrice: Double,
+        quantity: Int,
+        priceIsPerUnit: Boolean,
+    ): Double {
+        if (enteredPrice < 0 || quantity <= 0) return 0.0
+        return if (priceIsPerUnit) enteredPrice * quantity else enteredPrice
+    }
+
+    fun pricePerUnit(totalPrice: Double, quantity: Int): Double {
+        if (totalPrice < 0 || quantity <= 0) return 0.0
+        return totalPrice / quantity
+    }
+
     fun purchasableVolumeMl(
         budget: Double,
         packPrice: Double,
