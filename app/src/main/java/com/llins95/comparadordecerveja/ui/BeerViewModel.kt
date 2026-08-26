@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.llins95.comparadordecerveja.data.BeerOfferEntity
 import com.llins95.comparadordecerveja.data.BeerRepository
+import com.llins95.comparadordecerveja.domain.BeerPriceCalculator
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -12,7 +13,13 @@ import kotlinx.coroutines.launch
 
 class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
     val offers = repository.observeOffers()
-        .map { items -> items.sortedBy { it.pricePerLiter } }
+        .map { items ->
+            items.sortedWith(
+                compareBy<BeerOfferEntity> { it.pricePerLiter }
+                    .thenBy { it.totalPrice }
+                    .thenBy { it.quantity }
+            )
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -24,7 +31,8 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
         packageType: String,
         volumeMl: Int,
         quantity: Int,
-        totalPrice: Double,
+        enteredPrice: Double,
+        priceIsPerUnit: Boolean,
         store: String,
         hasReturnableBottle: Boolean
     ) {
@@ -35,7 +43,12 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
                     packageType = packageType.trim(),
                     volumeMl = volumeMl,
                     quantity = quantity,
-                    totalPrice = totalPrice,
+                    totalPrice = BeerPriceCalculator.promotionTotalPrice(
+                        enteredPrice,
+                        quantity,
+                        priceIsPerUnit,
+                    ),
+                    priceIsPerUnit = priceIsPerUnit,
                     store = store.trim(),
                     hasReturnableBottle = hasReturnableBottle
                 )
@@ -49,7 +62,8 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
         packageType: String,
         volumeMl: Int,
         quantity: Int,
-        totalPrice: Double,
+        enteredPrice: Double,
+        priceIsPerUnit: Boolean,
         store: String,
         hasReturnableBottle: Boolean
     ) {
@@ -60,7 +74,12 @@ class BeerViewModel(private val repository: BeerRepository) : ViewModel() {
                     packageType = packageType.trim(),
                     volumeMl = volumeMl,
                     quantity = quantity,
-                    totalPrice = totalPrice,
+                    totalPrice = BeerPriceCalculator.promotionTotalPrice(
+                        enteredPrice,
+                        quantity,
+                        priceIsPerUnit,
+                    ),
+                    priceIsPerUnit = priceIsPerUnit,
                     store = store.trim(),
                     hasReturnableBottle = hasReturnableBottle
                 )
