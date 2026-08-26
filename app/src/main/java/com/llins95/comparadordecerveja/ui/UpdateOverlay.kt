@@ -1,18 +1,9 @@
 package com.llins95.comparadordecerveja.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,20 +14,26 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun UpdateOverlay(viewModel: AppUpdateViewModel) {
+fun UpdateOverlay(
+    viewModel: AppUpdateViewModel,
+    manualOpenRequest: Int = 0,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var dismissedVersionCode by rememberSaveable { mutableIntStateOf(-1) }
 
     LaunchedEffect(Unit) {
         viewModel.checkAutomaticallyOnce()
+    }
+
+    LaunchedEffect(manualOpenRequest) {
+        if (manualOpenRequest > 0) showDialog = true
     }
 
     LaunchedEffect(state.status, state.availableUpdate?.versionCode) {
@@ -52,22 +49,6 @@ fun UpdateOverlay(viewModel: AppUpdateViewModel) {
             state.status == AppUpdateStatus.OpeningInstaller
         ) {
             showDialog = true
-        }
-    }
-
-    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Box(modifier = Modifier.fillMaxSize()) {
-        IconButton(
-            onClick = { showDialog = true },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = topPadding + 5.dp, end = 8.dp),
-        ) {
-            Icon(
-                Icons.Rounded.SystemUpdate,
-                contentDescription = "Atualização do aplicativo",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 
