@@ -44,11 +44,8 @@ fun UpdateOverlay(
         ) {
             showDialog = true
         }
-        if (state.status == AppUpdateStatus.Downloading ||
-            state.status == AppUpdateStatus.WaitingForInstallPermission ||
-            state.status == AppUpdateStatus.OpeningInstaller
-        ) {
-            showDialog = true
+        if (state.status == AppUpdateStatus.OpeningDownload) {
+            showDialog = false
         }
     }
 
@@ -56,10 +53,10 @@ fun UpdateOverlay(
         AppUpdateDialog(
             state = state,
             onCheck = viewModel::checkForUpdates,
-            onInstall = viewModel::downloadAndInstall,
+            onDownload = viewModel::openDownload,
             onDismiss = {
                 state.availableUpdate?.let { dismissedVersionCode = it.versionCode }
-                if (state.status != AppUpdateStatus.Downloading) {
+                if (state.status != AppUpdateStatus.Checking) {
                     showDialog = false
                 }
             },
@@ -71,12 +68,11 @@ fun UpdateOverlay(
 private fun AppUpdateDialog(
     state: AppUpdateUiState,
     onCheck: () -> Unit,
-    onInstall: () -> Unit,
+    onDownload: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val available = state.availableUpdate
-    val busy = state.status == AppUpdateStatus.Checking ||
-        state.status == AppUpdateStatus.Downloading
+    val busy = state.status == AppUpdateStatus.Checking
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -93,21 +89,15 @@ private fun AppUpdateDialog(
                         AppUpdateStatus.Checking -> "Verificando a versão mais recente…"
                         AppUpdateStatus.UpToDate -> "Você já está usando a versão mais recente."
                         AppUpdateStatus.Available ->
-                            "Nova versão disponível: ${available?.versionName} (${available?.versionCode})."
-                        AppUpdateStatus.WaitingForInstallPermission ->
-                            "Autorize a Cerva a instalar atualizações e volte ao aplicativo."
-                        AppUpdateStatus.Downloading ->
-                            "Baixando e validando a atualização com SHA-256…"
-                        AppUpdateStatus.OpeningInstaller ->
-                            "Atualização validada. Confirme a instalação na tela do Android."
+                            "Nova versão disponível: ${available?.versionName} (${available?.versionCode}). O download será aberto no navegador para manter o app sem permissão de instalar pacotes."
+                        AppUpdateStatus.OpeningDownload ->
+                            "Abrindo o download da atualização no navegador…"
                         AppUpdateStatus.Error ->
                             state.errorMessage ?: "Não foi possível verificar a atualização."
                     },
                     modifier = Modifier.padding(top = 12.dp),
                 )
-                if (state.status == AppUpdateStatus.Checking ||
-                    state.status == AppUpdateStatus.Downloading
-                ) {
+                if (state.status == AppUpdateStatus.Checking) {
                     CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
                 }
                 if (state.status == AppUpdateStatus.Available &&
@@ -128,24 +118,18 @@ private fun AppUpdateDialog(
         },
         confirmButton = {
             when (state.status) {
-                AppUpdateStatus.Available -> TextButton(onClick = onInstall) {
-                    Text("Baixar e instalar")
+                AppUpdateStatus.Available -> TextButton(onClick = onDownload) {
+                    Text("Baixar no navegador")
                 }
                 AppUpdateStatus.Checking,
-                AppUpdateStatus.Downloading -> Unit
-                AppUpdateStatus.OpeningInstaller -> TextButton(onClick = onDismiss) {
-                    Text("Fechar")
-                }
-                AppUpdateStatus.WaitingForInstallPermission -> TextButton(onClick = onInstall) {
-                    Text("Abrir permissão")
-                }
+                AppUpdateStatus.OpeningDownload -> Unit
                 else -> TextButton(onClick = onCheck) {
                     Text("Verificar atualizações")
                 }
             }
         },
         dismissButton = {
-            if (!busy && state.status != AppUpdateStatus.OpeningInstaller) {
+            if (!busy && state.status != AppUpdateStatus.OpeningDownload) {
                 TextButton(onClick = onDismiss) {
                     Text(if (state.status == AppUpdateStatus.Available) "Depois" else "Fechar")
                 }
