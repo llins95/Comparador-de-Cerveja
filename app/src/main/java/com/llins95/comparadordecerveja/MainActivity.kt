@@ -60,9 +60,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateViewModel.handleAppResumed()
-    }
 }
