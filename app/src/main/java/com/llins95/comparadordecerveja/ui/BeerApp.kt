@@ -799,6 +799,14 @@ private fun RankingScreen(offers: List<BeerOfferEntity>, padding: PaddingValues)
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            if (offer.store.isNotBlank()) {
+                                Text(
+                                    "Loja: ${offer.store}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                         PricePill(offer.pricePerLiter)
                     }
