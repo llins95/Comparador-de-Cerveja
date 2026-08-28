@@ -1357,6 +1357,14 @@ private fun OfferRow(offer: BeerOfferEntity) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (offer.store.isNotBlank()) {
+                    Text(
+                        "Loja: ${offer.store}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
             PricePill(offer.pricePerLiter)
         }
