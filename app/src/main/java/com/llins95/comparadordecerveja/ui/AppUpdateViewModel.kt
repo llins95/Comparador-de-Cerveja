@@ -17,9 +17,7 @@ enum class AppUpdateStatus {
     Checking,
     UpToDate,
     Available,
-    WaitingForInstallPermission,
-    Downloading,
-    OpeningInstaller,
+    OpeningDownload,
     Error,
 }
 
@@ -45,9 +43,7 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun checkForUpdates() {
-        if (_uiState.value.status == AppUpdateStatus.Checking ||
-            _uiState.value.status == AppUpdateStatus.Downloading
-        ) return
+        if (_uiState.value.status == AppUpdateStatus.Checking) return
 
         viewModelScope.launch {
             _uiState.update {
@@ -82,47 +78,20 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun downloadAndInstall() {
+    fun openDownload() {
         val update = _uiState.value.availableUpdate ?: return
-        if (_uiState.value.status == AppUpdateStatus.Downloading) return
-
-        if (!manager.canRequestPackageInstalls()) {
-            _uiState.update {
-                it.copy(
-                    status = AppUpdateStatus.WaitingForInstallPermission,
-                    errorMessage = null,
-                )
-            }
-            manager.openInstallPermissionSettings()
-            return
+        _uiState.update {
+            it.copy(status = AppUpdateStatus.OpeningDownload, errorMessage = null)
         }
-
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(status = AppUpdateStatus.Downloading, errorMessage = null)
-            }
-            runCatching { manager.downloadAndInstall(update) }
-                .onSuccess {
-                    _uiState.update {
-                        it.copy(status = AppUpdateStatus.OpeningInstaller, errorMessage = null)
-                    }
+        runCatching { manager.openDownload(update) }
+            .onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        status = AppUpdateStatus.Error,
+                        errorMessage = friendlyMessage(error),
+                    )
                 }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            status = AppUpdateStatus.Error,
-                            errorMessage = friendlyMessage(error),
-                        )
-                    }
-                }
-        }
-    }
-
-    fun handleAppResumed() {
-        if (_uiState.value.status != AppUpdateStatus.WaitingForInstallPermission) return
-        if (manager.canRequestPackageInstalls()) {
-            downloadAndInstall()
-        }
+            }
     }
 
     private fun friendlyMessage(error: Throwable): String {
