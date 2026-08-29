@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -105,7 +106,10 @@ fun BeerApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingReturnTab by rememberSaveable { mutableIntStateOf(4) }
+    var editingReturnToSearch by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var settingsSection by rememberSaveable { mutableIntStateOf(0) }
     val editingOffer = offers.firstOrNull { it.id == editingOfferId }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -119,11 +123,11 @@ fun BeerApp(
         AppTab("Histórico") { Icon(Icons.Rounded.History, contentDescription = null) }
     )
 
-    BackHandler(enabled = showSettings) {
-        if (settingsSection == 0) {
-            showSettings = false
-        } else {
-            settingsSection = 0
+    BackHandler(enabled = showSettings || showSearch) {
+        when {
+            showSearch -> showSearch = false
+            settingsSection == 0 -> showSettings = false
+            else -> settingsSection = 0
         }
     }
 
@@ -136,6 +140,7 @@ fun BeerApp(
                 title = {
                     Text(
                         text = when {
+                            showSearch -> "Procurar promoção"
                             showSettings && settingsSection == 1 -> "Cadastro de embalagens"
                             showSettings && settingsSection == 2 -> "Cadastro de lojas"
                             showSettings -> "Configurações"
@@ -150,13 +155,13 @@ fun BeerApp(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 navigationIcon = {
-                    if (showSettings) {
+                    if (showSettings || showSearch) {
                         IconButton(
                             onClick = {
-                                if (settingsSection == 0) {
-                                    showSettings = false
-                                } else {
-                                    settingsSection = 0
+                                when {
+                                    showSearch -> showSearch = false
+                                    settingsSection == 0 -> showSettings = false
+                                    else -> settingsSection = 0
                                 }
                             }
                         ) {
@@ -165,7 +170,15 @@ fun BeerApp(
                     }
                 },
                 actions = {
-                    if (!showSettings) {
+                    if (!showSettings && !showSearch) {
+                        IconButton(
+                            onClick = {
+                                searchQuery = ""
+                                showSearch = true
+                            }
+                        ) {
+                            Icon(Icons.Rounded.Search, contentDescription = "Procurar promoção")
+                        }
                         IconButton(
                             onClick = {
                                 settingsSection = 0
@@ -179,7 +192,7 @@ fun BeerApp(
             )
         },
         bottomBar = {
-            if (!showSettings) {
+            if (!showSettings && !showSearch) {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     tonalElevation = 0.dp
@@ -222,6 +235,20 @@ fun BeerApp(
                     onOpenStores = { settingsSection = 2 },
                 )
             }
+        } else if (showSearch) {
+            SearchOffersScreen(
+                offers = offers,
+                padding = padding,
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onEdit = { offer ->
+                    editingReturnTab = selectedTab
+                    editingReturnToSearch = true
+                    showSearch = false
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+            )
         } else when (selectedTab) {
             0 -> HomeScreen(
                 offers,
@@ -262,6 +289,10 @@ fun BeerApp(
                             returnable
                         )
                         selectedTab = editingReturnTab
+                        if (editingReturnToSearch) {
+                            showSearch = true
+                            editingReturnToSearch = false
+                        }
                     }
                     editingOfferId = null
                 },
@@ -269,6 +300,10 @@ fun BeerApp(
                     {
                         editingOfferId = null
                         selectedTab = editingReturnTab
+                        if (editingReturnToSearch) {
+                            showSearch = true
+                            editingReturnToSearch = false
+                        }
                     }
                 } else {
                     null
@@ -280,6 +315,7 @@ fun BeerApp(
                 padding = padding,
                 onEdit = { offer ->
                     editingReturnTab = 3
+                    editingReturnToSearch = false
                     editingOfferId = offer.id
                     selectedTab = 1
                 },
@@ -289,6 +325,7 @@ fun BeerApp(
                 padding = padding,
                 onEdit = { offer ->
                     editingReturnTab = 4
+                    editingReturnToSearch = false
                     editingOfferId = offer.id
                     selectedTab = 1
                 },
@@ -1174,6 +1211,131 @@ private fun StoresSettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
+        }
+    }
+}
+
+
+@Composable
+private fun SearchOffersScreen(
+    offers: List<BeerOfferEntity>,
+    padding: PaddingValues,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onEdit: (BeerOfferEntity) -> Unit,
+) {
+    val normalizedQuery = query.trim()
+    val filteredOffers = remember(offers, normalizedQuery) {
+        val sortedOffers = offers.sortedByDescending { it.createdAt }
+        if (normalizedQuery.isBlank()) {
+            sortedOffers
+        } else {
+            sortedOffers.filter { offer ->
+                val searchableText = buildString {
+                    append(offer.brand)
+                    append(' ')
+                    append(offer.packageType)
+                    append(' ')
+                    append(offer.store)
+                    append(' ')
+                    append(offer.volumeMl)
+                    append(" ml ")
+                    append(offer.quantity)
+                }
+                searchableText.contains(normalizedQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    label = { Text("Buscar promoção") },
+                    placeholder = { Text("Ex.: Brahma, lata, nome da loja...") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Search, contentDescription = null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                )
+                Text(
+                    "Pesquise por marca, embalagem, loja, volume ou quantidade mínima.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        when {
+            offers.isEmpty() -> {
+                item { EmptyMessage("Nenhuma promoção cadastrada para pesquisar.") }
+            }
+            filteredOffers.isEmpty() -> {
+                item { EmptyMessage("Nenhuma promoção encontrada para \"$normalizedQuery\".") }
+            }
+            else -> {
+                item {
+                    Text(
+                        if (filteredOffers.size == 1) "1 promoção encontrada" else "${filteredOffers.size} promoções encontradas",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                items(filteredOffers, key = { it.id }) { offer ->
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Text(
+                                offer.brand,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                offerDescription(offer),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (offer.store.isNotBlank()) {
+                                Text(
+                                    "Loja: ${offer.store}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                            Text(
+                                "${minimumPurchaseDescription(offer)} • ${formatPricePerLiter(offer.pricePerLiter)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            OutlinedButton(
+                                onClick = { onEdit(offer) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Icon(Icons.Rounded.Edit, contentDescription = null)
+                                Spacer(Modifier.padding(horizontal = 4.dp))
+                                Text("Editar promoção")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
