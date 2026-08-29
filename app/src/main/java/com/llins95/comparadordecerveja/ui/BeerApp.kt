@@ -104,6 +104,7 @@ fun BeerApp(
     val stores by settingsViewModel.stores.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingReturnTab by rememberSaveable { mutableIntStateOf(4) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var settingsSection by rememberSaveable { mutableIntStateOf(0) }
     val editingOffer = offers.firstOrNull { it.id == editingOfferId }
@@ -260,25 +261,34 @@ fun BeerApp(
                             store,
                             returnable
                         )
-                        selectedTab = 4
+                        selectedTab = editingReturnTab
                     }
                     editingOfferId = null
                 },
                 onCancel = if (editingOfferId != null) {
                     {
                         editingOfferId = null
-                        selectedTab = 4
+                        selectedTab = editingReturnTab
                     }
                 } else {
                     null
                 }
             )
             2 -> RankingScreen(offers, padding)
-            3 -> SimulatorScreen(offers, padding)
+            3 -> SimulatorScreen(
+                offers = offers,
+                padding = padding,
+                onEdit = { offer ->
+                    editingReturnTab = 3
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+            )
             else -> HistoryScreen(
                 offers = offers,
                 padding = padding,
                 onEdit = { offer ->
+                    editingReturnTab = 4
                     editingOfferId = offer.id
                     selectedTab = 1
                 },
@@ -1169,7 +1179,11 @@ private fun StoresSettingsScreen(
 }
 
 @Composable
-private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValues) {
+private fun SimulatorScreen(
+    offers: List<BeerOfferEntity>,
+    padding: PaddingValues,
+    onEdit: (BeerOfferEntity) -> Unit,
+) {
     var budgetText by rememberSaveable { mutableStateOf("30") }
     val budget = budgetText.replace(',', '.').toDoubleOrNull() ?: 0.0
     val results = remember(offers, budget) {
@@ -1247,6 +1261,15 @@ private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValue
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
+                        OutlinedButton(
+                            onClick = { onEdit(offer) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null)
+                            Spacer(Modifier.padding(horizontal = 4.dp))
+                            Text("Editar promoção")
+                        }
                     }
                 }
             }
