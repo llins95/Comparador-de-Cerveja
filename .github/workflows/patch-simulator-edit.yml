@@ -1,0 +1,132 @@
+name: Patch simulator edit button
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/patch-simulator-edit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.5.0
+
+      - name: Add edit action to Simulator
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/com/llins95/comparadordecerveja/ui/BeerApp.kt')
+          text = path.read_text()
+
+          def replace_once(old: str, new: str, label: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: esperado 1 trecho, encontrado {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '    var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }\n    var showSettings by rememberSaveable { mutableStateOf(false) }',
+              '    var editingOfferId by rememberSaveable { mutableStateOf<Long?>(null) }\n    var editingReturnTab by rememberSaveable { mutableIntStateOf(4) }\n    var showSettings by rememberSaveable { mutableStateOf(false) }',
+              'estado de retorno da edição',
+          )
+
+          if text.count('                        selectedTab = 4') != 2:
+              raise SystemExit('retorno atual da edição não corresponde ao esperado')
+          text = text.replace('                        selectedTab = 4', '                        selectedTab = editingReturnTab')
+
+          replace_once(
+              '            3 -> SimulatorScreen(offers, padding)',
+              '''            3 -> SimulatorScreen(
+                offers = offers,
+                padding = padding,
+                onEdit = { offer ->
+                    editingReturnTab = 3
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+            )''',
+              'chamada do simulador',
+          )
+
+          replace_once(
+              '''                onEdit = { offer ->
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+                onDelete = { offer ->''',
+              '''                onEdit = { offer ->
+                    editingReturnTab = 4
+                    editingOfferId = offer.id
+                    selectedTab = 1
+                },
+                onDelete = { offer ->''',
+              'retorno da edição pelo histórico',
+          )
+
+          replace_once(
+              'private fun SimulatorScreen(offers: List<BeerOfferEntity>, padding: PaddingValues) {',
+              '''private fun SimulatorScreen(
+    offers: List<BeerOfferEntity>,
+    padding: PaddingValues,
+    onEdit: (BeerOfferEntity) -> Unit,
+) {''',
+              'assinatura do simulador',
+          )
+
+          replace_once(
+              '''                        Text(
+                            "Você consegue comprar ${formatUnits(units)} (${formatVolume(volume)})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )''',
+              '''                        Text(
+                            "Você consegue comprar ${formatUnits(units)} (${formatVolume(volume)})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        OutlinedButton(
+                            onClick = { onEdit(offer) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null)
+                            Spacer(Modifier.padding(horizontal = 4.dp))
+                            Text("Editar promoção")
+                        }''',
+              'botão editar promoção',
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Test and build
+        run: gradle testDebugUnitTest assembleDebug
+
+      - name: Commit validated fix and remove temporary workflow
+        run: |
+          rm .github/workflows/patch-simulator-edit.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: adicionar edição de promoções no simulador"
+          git push
